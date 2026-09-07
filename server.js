@@ -1,21 +1,14 @@
+/**
+ * オセロ リアルタイム対戦サーバー (npm不要・ゼロ依存 Pure Node.js 実装)
+ * 外部パッケージ (ws等) のインストール不要で、Node.js さえあれば動作します。
+ */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-
-let WebSocket;
-let WebSocketServer;
-try {
-  const wsPkg = require('ws');
-  WebSocket = wsPkg.WebSocket || wsPkg;
-  WebSocketServer = wsPkg.WebSocketServer || wsPkg.Server;
-} catch (e) {
-  console.error('\n【エラー】ws パッケージが見つかりません。');
-  console.error('以下のコマンドを実行してインストールしてください:');
-  console.error('  npm install\n');
-  process.exit(1);
-}
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
+const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 // MIMEタイプマッピング
 const MIME_TYPES = {
@@ -28,14 +21,12 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml'
 };
 
-// 静的HTTPサーバー
+// 静的ファイル配信 HTTPサーバー
 const server = http.createServer((req, res) => {
-  // CORSヘッダー付与
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
   let filePath = req.url === '/' ? '/practice1.html' : req.url;
-  // クエリパラメータを除去
   filePath = filePath.split('?')[0];
 
   const absolutePath = path.join(__dirname, filePath);
@@ -55,10 +46,145 @@ const server = http.createServer((req, res) => {
   });
 });
 
-// WebSocketサーバー
-const wss = new WebSocketServer({ server });
+// ============================================================
+// ゼロ依存 軽量 WebSocket プロトコル実装 (RFC 6455)
+// ============================================================
+class ClientConnection {
+  constructor(socket) {
+    this.socket = socket;
+    this.buffer = Buffer.alloc(0);
+    this.onMessageCallback = null;
+    this.onCloseCallback = null;
 
-// ルーム管理マップ: roomId => { host: ws, guest: ws, board: [...], turn: 1 }
+    socket.on('data', (chunk) => this.handleData(chunk));
+    socket.on('close', () => {
+      if (this.onCloseCallback) this.onCloseCallback();
+    });
+    socket.on('error', () => {
+      if (this.onCloseCallback) this.onCloseCallback();
+    });
+  }
+
+  sendJson(obj) {
+    this.sendText(JSON.stringify(obj));
+  }
+
+  sendText(text) {
+    if (this.socket.destroyed) return;
+    const payload = Buffer.from(text, 'utf8');
+    const length = payload.length;
+    let header;
+
+    if (length < 126) {
+      header = Buffer.alloc(2);
+      header[0] = 0x81; // FIN + Text frame
+      header[1] = length;
+    } else if (length < 65536) {
+      header = Buffer.alloc(4);
+      header[0] = 0x81;
+      header[1] = 126;
+      header.writeUInt16BE(length, 2);
+    } else {
+      header = Buffer.alloc(10);
+      header[0] = 0x81;
+      header[1] = 127;
+      header.writeBigUInt64BE(BigInt(length), 2);
+    }
+
+    this.socket.write(Buffer.concat([header, payload]));
+  }
+
+  handleData(chunk) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+
+    while (this.buffer.length >= 2) {
+      const b0 = this.buffer[0];
+      const b1 = this.buffer[1];
+
+      const opcode = b0 & 0x0f;
+      const isMasked = (b1 & 0x80) !== 0;
+      let payloadLength = b1 & 0x7f;
+      let offset = 2;
+
+      // Close frame (opcode 8)
+      if (opcode === 8) {
+        this.socket.end();
+        return;
+      }
+      // Ping frame (opcode 9)
+      if (opcode === 9) {
+        // Pong
+        const pong = Buffer.from([0x8a, 0x00]);
+        this.socket.write(pong);
+        this.buffer = this.buffer.slice(2);
+        continue;
+      }
+
+      if (payloadLength === 126) {
+        if (this.buffer.length < 4) return;
+        payloadLength = this.buffer.readUInt16BE(2);
+        offset = 4;
+      } else if (payloadLength === 127) {
+        if (this.buffer.length < 10) return;
+        payloadLength = Number(this.buffer.readBigUInt64BE(2));
+        offset = 10;
+      }
+
+      let maskKey = null;
+      if (isMasked) {
+        if (this.buffer.length < offset + 4) return;
+        maskKey = this.buffer.slice(offset, offset + 4);
+        offset += 4;
+      }
+
+      if (this.buffer.length < offset + payloadLength) return;
+
+      const payload = this.buffer.slice(offset, offset + payloadLength);
+      this.buffer = this.buffer.slice(offset + payloadLength);
+
+      if (isMasked && maskKey) {
+        for (let i = 0; i < payload.length; i++) {
+          payload[i] ^= maskKey[i % 4];
+        }
+      }
+
+      if (opcode === 1 && this.onMessageCallback) { // Text frame
+        this.onMessageCallback(payload.toString('utf8'));
+      }
+    }
+  }
+}
+
+// WebSocket ハンドシェイク処理
+server.on('upgrade', (req, socket, head) => {
+  const key = req.headers['sec-websocket-key'];
+  if (!key) {
+    socket.destroy();
+    return;
+  }
+
+  const acceptKey = crypto
+    .createHash('sha1')
+    .update(key + WS_GUID)
+    .digest('base64');
+
+  const headers = [
+    'HTTP/1.1 101 Switching Protocols',
+    'Upgrade: websocket',
+    'Connection: Upgrade',
+    `Sec-WebSocket-Accept: ${acceptKey}`,
+    '\r\n'
+  ];
+
+  socket.write(headers.join('\r\n'));
+
+  const client = new ClientConnection(socket);
+  handleClientConnection(client);
+});
+
+// ============================================================
+// オセロ ルーム管理ロジック
+// ============================================================
 const rooms = new Map();
 
 function generateRoomId() {
@@ -69,38 +195,31 @@ function generateRoomId() {
   return roomId;
 }
 
-function sendJson(ws, data) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
-
-wss.on('connection', (ws) => {
+function handleClientConnection(client) {
   let currentRoomId = null;
-  let userRole = null; // 'black' (host) or 'white' (guest)
+  let userRole = null;
 
-  ws.on('message', (messageRaw) => {
+  client.onMessageCallback = (messageRaw) => {
     let msg;
     try {
       msg = JSON.parse(messageRaw);
     } catch (e) {
-      console.error('Invalid JSON received:', messageRaw);
       return;
     }
 
     switch (msg.type) {
       case 'CREATE_ROOM': {
         currentRoomId = generateRoomId();
-        userRole = 'black'; // ホストは黒（先手）
+        userRole = 'black';
 
         rooms.set(currentRoomId, {
           id: currentRoomId,
-          host: ws,
+          host: client,
           guest: null
         });
 
-        console.log(`[Room ${currentRoomId}] 作成されました（ホスト接続）`);
-        sendJson(ws, {
+        console.log(`[Room ${currentRoomId}] 部屋が作成されました (ホスト待機中)`);
+        client.sendJson({
           type: 'ROOM_CREATED',
           roomId: currentRoomId,
           role: 'black',
@@ -114,7 +233,7 @@ wss.on('connection', (ws) => {
         const room = rooms.get(targetRoomId);
 
         if (!room) {
-          sendJson(ws, {
+          client.sendJson({
             type: 'ERROR',
             message: `部屋番号 ${targetRoomId} が見つかりません。`
           });
@@ -122,30 +241,27 @@ wss.on('connection', (ws) => {
         }
 
         if (room.guest) {
-          sendJson(ws, {
+          client.sendJson({
             type: 'ERROR',
             message: `部屋番号 ${targetRoomId} は既に満員です。`
           });
           return;
         }
 
-        // 参加成功
         currentRoomId = targetRoomId;
-        userRole = 'white'; // ゲストは白（後手）
-        room.guest = ws;
+        userRole = 'white';
+        room.guest = client;
 
-        console.log(`[Room ${currentRoomId}] ゲストが参加しました。対戦を開始します。`);
+        console.log(`[Room ${currentRoomId}] ゲストが参加しました！対戦を開始します。`);
 
-        // ゲストへ通知
-        sendJson(ws, {
+        client.sendJson({
           type: 'GAME_START',
           roomId: currentRoomId,
           role: 'white',
           message: '部屋に参加しました！対局を開始します。'
         });
 
-        // ホストへ通知
-        sendJson(room.host, {
+        room.host.sendJson({
           type: 'GAME_START',
           roomId: currentRoomId,
           role: 'black',
@@ -159,9 +275,9 @@ wss.on('connection', (ws) => {
         const room = rooms.get(currentRoomId);
         if (!room) return;
 
-        const opponent = ws === room.host ? room.guest : room.host;
+        const opponent = client === room.host ? room.guest : room.host;
         if (opponent) {
-          sendJson(opponent, {
+          opponent.sendJson({
             type: 'OPPONENT_MOVE',
             move: msg.move
           });
@@ -174,9 +290,9 @@ wss.on('connection', (ws) => {
         const room = rooms.get(currentRoomId);
         if (!room) return;
 
-        const opponent = ws === room.host ? room.guest : room.host;
+        const opponent = client === room.host ? room.guest : room.host;
         if (opponent) {
-          sendJson(opponent, {
+          opponent.sendJson({
             type: 'OPPONENT_PASS',
             player: msg.player
           });
@@ -189,11 +305,9 @@ wss.on('connection', (ws) => {
         const room = rooms.get(currentRoomId);
         if (!room) return;
 
-        const opponent = ws === room.host ? room.guest : room.host;
+        const opponent = client === room.host ? room.guest : room.host;
         if (opponent) {
-          sendJson(opponent, {
-            type: 'RESTART_REQUEST'
-          });
+          opponent.sendJson({ type: 'RESTART_REQUEST' });
         }
         break;
       }
@@ -203,10 +317,9 @@ wss.on('connection', (ws) => {
         const room = rooms.get(currentRoomId);
         if (!room) return;
 
-        // 両者に再戦スタートを通知
-        sendJson(room.host, { type: 'RESTART_START' });
+        room.host.sendJson({ type: 'RESTART_START' });
         if (room.guest) {
-          sendJson(room.guest, { type: 'RESTART_START' });
+          room.guest.sendJson({ type: 'RESTART_START' });
         }
         break;
       }
@@ -216,9 +329,9 @@ wss.on('connection', (ws) => {
         const room = rooms.get(currentRoomId);
         if (!room) return;
 
-        const opponent = ws === room.host ? room.guest : room.host;
+        const opponent = client === room.host ? room.guest : room.host;
         if (opponent) {
-          sendJson(opponent, {
+          opponent.sendJson({
             type: 'CHAT_MESSAGE',
             sender: userRole,
             text: msg.text
@@ -227,18 +340,18 @@ wss.on('connection', (ws) => {
         break;
       }
     }
-  });
+  };
 
-  ws.on('close', () => {
+  client.onCloseCallback = () => {
     if (currentRoomId && rooms.has(currentRoomId)) {
       const room = rooms.get(currentRoomId);
-      const isHost = ws === room.host;
+      const isHost = client === room.host;
       const opponent = isHost ? room.guest : room.host;
 
-      console.log(`[Room ${currentRoomId}] プレイヤーが退出しました (${isHost ? 'ホスト' : 'ゲスト'})`);
+      console.log(`[Room ${currentRoomId}] プレイヤーが切断しました`);
 
       if (opponent) {
-        sendJson(opponent, {
+        opponent.sendJson({
           type: 'OPPONENT_LEFT',
           message: '対戦相手との通信が切断されました。'
         });
@@ -246,12 +359,12 @@ wss.on('connection', (ws) => {
 
       rooms.delete(currentRoomId);
     }
-  });
-});
+  };
+}
 
 server.listen(PORT, () => {
   console.log('====================================================');
-  console.log(` 🟢 オセロ リアルタイム対戦サーバーが起動しました！`);
+  console.log(` 🟢 オセロ リアルタイム対戦サーバー起動完了！ (npm不要)`);
   console.log(` 🌐 ブラウザで以下のURLを開いてください:`);
   console.log(`    http://localhost:${PORT}`);
   console.log('====================================================');
