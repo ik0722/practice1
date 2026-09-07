@@ -1,11 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オセロゲーム (Reversi)</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    
+
+  <header>
+    <h1>オセロ (Reversi)</h1>
+  </header>
+
+  <div class="main-container">
+    <!-- スコア＆手番表示 -->
+    <div class="status-panel">
+      <div id="player-black-card" class="player-card active">
+        <div class="player-preview-disc preview-black"></div>
+        <div class="player-info">
+          <span class="player-name" id="name-black">黒 (あなた)</span>
+          <span class="player-score" id="score-black">2</span>
+        </div>
+      </div>
+
+      <div class="turn-indicator" id="turn-text">黒の手番</div>
+
+      <div id="player-white-card" class="player-card">
+        <div class="player-preview-disc preview-white"></div>
+        <div class="player-info">
+          <span class="player-name" id="name-white">白 (CPU 初級)</span>
+          <span class="player-score" id="score-white">2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- メッセージ表示エリア -->
+    <div class="message-banner" id="message-banner"></div>
+
+    <!-- 盤面 -->
+    <div class="board-wrapper">
+      <div id="board"></div>
+    </div>
+
+    <!-- ゲーム設定バー -->
+    <div class="settings-bar">
+      <div>
+        <label for="mode-select">対戦モード: </label>
+        <select id="mode-select">
+          <option value="pvp">2人で対戦</option>
+          <option value="cpu-easy" selected>CPU対戦 (初級)</option>
+          <option value="cpu-normal">CPU対戦 (中級)</option>
+          <option value="cpu-hard">CPU対戦 (上級)</option>
+        </select>
+      </div>
+      <div>
+        <label for="cpu-color-select">あなたの色: </label>
+        <select id="cpu-color-select">
+          <option value="1">黒 (先手)</option>
+          <option value="2">白 (後手)</option>
+        </select>
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" id="guide-toggle" checked> ガイド表示
+        </label>
+      </div>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div class="controls">
+      <button class="btn" id="btn-undo" title="1手前の状態に戻します">
+        <span>↩ 待った</span>
+      </button>
+      <button class="btn btn-primary" id="btn-restart">
+        <span>🔄 最初からやり直す</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 終局結果モーダル -->
+  <div class="modal-overlay" id="result-modal">
+    <div class="modal-content">
+      <h2 class="modal-title" id="modal-winner">対局終了</h2>
+      <div class="modal-result-detail" id="modal-score"></div>
+      <div class="modal-btns">
+        <button class="btn btn-primary" id="modal-btn-restart">もう一度遊ぶ</button>
+        <button class="btn" id="modal-btn-close">盤面を見る</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
