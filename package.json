@@ -1,0 +1,12 @@
+{
+  "name": "othello-online",
+  "version": "1.0.0",
+  "description": "Realtime multiplayer Othello game using Node.js and WebSocket",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

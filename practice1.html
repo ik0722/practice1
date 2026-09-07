@@ -3,13 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>オセロゲーム (Reversi)</title>
+  <title>オセロ (Reversi) - リアルタイム対戦</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <header>
     <h1>オセロ (Reversi)</h1>
+    <div class="connection-status" id="connection-badge">
+      <span class="status-dot offline"></span>
+      <span id="connection-text">ローカルモード</span>
+    </div>
   </header>
 
   <div class="main-container">
@@ -18,7 +22,7 @@
       <div id="player-black-card" class="player-card active">
         <div class="player-preview-disc preview-black"></div>
         <div class="player-info">
-          <span class="player-name" id="name-black">黒 (あなた)</span>
+          <span class="player-name" id="name-black">黒 (先手)</span>
           <span class="player-score" id="score-black">2</span>
         </div>
       </div>
@@ -28,7 +32,7 @@
       <div id="player-white-card" class="player-card">
         <div class="player-preview-disc preview-white"></div>
         <div class="player-info">
-          <span class="player-name" id="name-white">白 (CPU 初級)</span>
+          <span class="player-name" id="name-white">白 (後手)</span>
           <span class="player-score" id="score-white">2</span>
         </div>
       </div>
@@ -37,9 +41,27 @@
     <!-- メッセージ表示エリア -->
     <div class="message-banner" id="message-banner"></div>
 
+    <!-- オンライン対戦用バナー (オンライン時のみ表示) -->
+    <div class="online-bar hidden" id="online-bar">
+      <div class="room-info">
+        <span>部屋番号: <strong id="display-room-id">----</strong></span>
+        <button class="btn btn-sm" id="btn-copy-room">コピー</button>
+      </div>
+      <div class="online-role-info" id="display-role-info">あなたの色: -</div>
+    </div>
+
     <!-- 盤面 -->
     <div class="board-wrapper">
       <div id="board"></div>
+    </div>
+
+    <!-- クイックチャット・リアクション (オンライン時用) -->
+    <div class="chat-bar hidden" id="chat-bar">
+      <button class="btn btn-chat" data-chat="よろしくお願いします！">よろしく！</button>
+      <button class="btn btn-chat" data-chat="いい手ですね！">ナイス！</button>
+      <button class="btn btn-chat" data-chat="うーん、考え中...">考え中🤔</button>
+      <button class="btn btn-chat" data-chat="ありがとうございました！">ありがとう！</button>
+      <button class="btn btn-chat" data-chat="参りました！">参った！</button>
     </div>
 
     <!-- ゲーム設定バー -->
@@ -47,13 +69,14 @@
       <div>
         <label for="mode-select">対戦モード: </label>
         <select id="mode-select">
-          <option value="pvp">2人で対戦</option>
-          <option value="cpu-easy" selected>CPU対戦 (初級)</option>
+          <option value="cpu-easy">CPU対戦 (初級)</option>
           <option value="cpu-normal">CPU対戦 (中級)</option>
           <option value="cpu-hard">CPU対戦 (上級)</option>
+          <option value="pvp">2人で対戦 (オフライン)</option>
+          <option value="online">🌐 オンライン対戦 (リアルタイム)</option>
         </select>
       </div>
-      <div>
+      <div id="cpu-color-group">
         <label for="cpu-color-select">あなたの色: </label>
         <select id="cpu-color-select">
           <option value="1">黒 (先手)</option>
@@ -75,6 +98,48 @@
       <button class="btn btn-primary" id="btn-restart">
         <span>🔄 最初からやり直す</span>
       </button>
+    </div>
+  </div>
+
+  <!-- オンライン対戦 部屋作成・参加モーダル -->
+  <div class="modal-overlay" id="online-modal">
+    <div class="modal-content">
+      <h2 class="modal-title">オンライン対戦</h2>
+      <p class="modal-desc">部屋を作って友達を招待するか、部屋番号を入力して参加してください。</p>
+
+      <div class="online-modal-options">
+        <div class="modal-box">
+          <h3>部屋を作る (先手: 黒)</h3>
+          <button class="btn btn-primary" id="btn-create-room">新しい部屋を作成</button>
+        </div>
+
+        <div class="modal-divider">または</div>
+
+        <div class="modal-box">
+          <h3>部屋に入る (後手: 白)</h3>
+          <div class="input-group">
+            <input type="text" id="input-room-id" placeholder="部屋番号 (4桁)" maxlength="10">
+            <button class="btn" id="btn-join-room">参加</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-btns" style="margin-top: 20px;">
+        <button class="btn" id="btn-cancel-online">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 待機中モーダル -->
+  <div class="modal-overlay" id="waiting-modal">
+    <div class="modal-content">
+      <h2 class="modal-title">対戦相手を待機中...</h2>
+      <p>部屋番号: <span class="waiting-room-id" id="waiting-room-id">----</span></p>
+      <p class="sub-text">相手にこの部屋番号を教えてください。</p>
+      <div class="loader"></div>
+      <div class="modal-btns" style="margin-top: 16px;">
+        <button class="btn" id="btn-cancel-waiting">対戦をやめる</button>
+      </div>
     </div>
   </div>
 
