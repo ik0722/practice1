@@ -93,6 +93,11 @@ class OthelloGame {
     this.modalBtnRestartEl = document.getElementById('modal-btn-restart');
     this.modalBtnCloseEl = document.getElementById('modal-btn-close');
 
+    // 相手退出モーダル
+    this.opponentLeftModalEl = document.getElementById('opponent-left-modal');
+    this.btnResumeCpuEl = document.getElementById('btn-resume-cpu');
+    this.btnNewCpuEl = document.getElementById('btn-new-cpu');
+
     // 盤面グリッド生成 (8x8)
     this.boardEl.innerHTML = '';
     this.cellElements = [];
@@ -179,6 +184,10 @@ class OthelloGame {
       this.updateModeUI();
       this.startNewGame();
     });
+
+    // 相手退出モーダルのボタンイベント
+    this.btnResumeCpuEl.addEventListener('click', () => this.resumeWithCpu());
+    this.btnNewCpuEl.addEventListener('click', () => this.switchToCpu(true));
 
     this.btnCopyRoomEl.addEventListener('click', () => {
       if (this.onlineRoomId) {
@@ -671,6 +680,10 @@ class OthelloGame {
     this.ws.onclose = () => {
       if (this.mode === 'online') {
         this.setConnectionStatus('offline', '切断されました');
+        if (this.isOnlineReady && !this.isGameOver) {
+          this.isOnlineReady = false;
+          this.openModal(this.opponentLeftModalEl);
+        }
         this.isOnlineReady = false;
       }
     };
@@ -750,10 +763,11 @@ class OthelloGame {
       }
 
       case 'OPPONENT_LEFT': {
-        alert(data.message || '対戦相手が退出しました。');
         this.isOnlineReady = false;
         this.setConnectionStatus('offline', '相手が退出しました');
-        this.setMessage('相手が退出したため対局を中断しました。');
+        this.setMessage('対戦相手が退出しました。');
+        // alertの代わりに専用モーダルを表示
+        this.openModal(this.opponentLeftModalEl);
         break;
       }
 
@@ -765,6 +779,40 @@ class OthelloGame {
         this.updateModeUI();
         break;
       }
+    }
+  }
+
+  resumeWithCpu() {
+    this.closeModal(this.opponentLeftModalEl);
+    const myRole = this.onlineRole || BLACK;
+    this.disconnectOnline();
+
+    // CPUモードに切り替え（自分の手番・色を維持）
+    this.mode = 'cpu-easy';
+    this.modeSelectEl.value = 'cpu-easy';
+    this.humanColor = myRole;
+    this.cpuColorSelectEl.value = myRole.toString();
+    this.updateModeUI();
+
+    this.setMessage('🤖 CPU対戦に切り替えました！ゲームを続行します。');
+    this.renderBoard();
+
+    // もし相手（CPU側）の手番なら、即座にCPUに思考・着手させる
+    if (this.currentTurn !== this.humanColor && !this.isGameOver) {
+      this.checkCpuTurn();
+    }
+  }
+
+  switchToCpu(startNew = false) {
+    this.closeModal(this.opponentLeftModalEl);
+    this.disconnectOnline();
+    this.mode = 'cpu-easy';
+    this.modeSelectEl.value = 'cpu-easy';
+    this.updateModeUI();
+
+    if (startNew) {
+      this.startNewGame();
+      this.setMessage('CPU対戦（初級）を開始しました。');
     }
   }
 

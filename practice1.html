@@ -155,6 +155,25 @@
     </div>
   </div>
 
+  <!-- 相手退出通知モーダル -->
+  <div class="modal-overlay" id="opponent-left-modal">
+    <div class="modal-content">
+      <h2 class="modal-title" style="color: #e74c3c;">⚠️ 対戦相手が退出しました</h2>
+      <p class="modal-desc" style="margin-bottom: 20px;">
+        相手との接続が切断されました。<br>
+        自動的に<strong>CPU対戦モード</strong>に切り替えます。
+      </p>
+      <div class="modal-btns" style="flex-direction: column; gap: 10px;">
+        <button class="btn btn-primary" id="btn-resume-cpu" style="width: 100%;">
+          🤖 このままCPUと対戦を続ける
+        </button>
+        <button class="btn" id="btn-new-cpu" style="width: 100%;">
+          🔄 新しくCPU対戦を始める
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 </html>
