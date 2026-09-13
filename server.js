@@ -215,19 +215,22 @@ function handleClientConnection(client) {
     switch (msg.type) {
       case 'CREATE_ROOM': {
         currentRoomId = generateRoomId();
-        userRole = 'black';
+        const hostChoice = msg.hostChoice || 'black'; // 'black', 'white', or 'random'
 
         rooms.set(currentRoomId, {
           id: currentRoomId,
           host: client,
-          guest: null
+          guest: null,
+          hostChoice: hostChoice,
+          hostRole: 'black',
+          guestRole: 'white'
         });
 
-        console.log(`[Room ${currentRoomId}] 部屋が作成されました (ホスト待機中)`);
+        console.log(`[Room ${currentRoomId}] 部屋が作成されました (希望手番: ${hostChoice})`);
         client.sendJson({
           type: 'ROOM_CREATED',
           roomId: currentRoomId,
-          role: 'black',
+          hostChoice: hostChoice,
           message: '部屋を作成しました。相手の参加を待っています...'
         });
         break;
@@ -254,23 +257,35 @@ function handleClientConnection(client) {
         }
 
         currentRoomId = targetRoomId;
-        userRole = 'white';
+
+        // 手番の決定
+        let hostRole = room.hostChoice || 'black';
+        if (hostRole === 'random') {
+          hostRole = Math.random() < 0.5 ? 'black' : 'white';
+        }
+        const guestRole = hostRole === 'black' ? 'white' : 'black';
+
+        userRole = guestRole;
+        room.hostRole = hostRole;
+        room.guestRole = guestRole;
         room.guest = client;
 
-        console.log(`[Room ${currentRoomId}] ゲストが参加しました！対戦を開始します。`);
+        console.log(`[Room ${currentRoomId}] 対戦開始: ホスト=${hostRole}, ゲスト=${guestRole}`);
 
+        // ゲストへ通知
         client.sendJson({
           type: 'GAME_START',
           roomId: currentRoomId,
-          role: 'white',
-          message: '部屋に参加しました！対局を開始します。'
+          role: guestRole,
+          message: `部屋に参加しました！あなたは ${guestRole === 'black' ? '黒 (先手)' : '白 (後手)'} です。`
         });
 
+        // ホストへ通知
         room.host.sendJson({
           type: 'GAME_START',
           roomId: currentRoomId,
-          role: 'black',
-          message: '対戦相手が参加しました！対局を開始します。'
+          role: hostRole,
+          message: `対戦相手が参加しました！あなたは ${hostRole === 'black' ? '黒 (先手)' : '白 (後手)'} です。`
         });
         break;
       }
@@ -322,9 +337,22 @@ function handleClientConnection(client) {
         const room = rooms.get(currentRoomId);
         if (!room) return;
 
-        room.host.sendJson({ type: 'RESTART_START' });
+        // 再戦時は手番を入れ替え
+        const prevHostRole = room.hostRole || 'black';
+        room.hostRole = prevHostRole === 'black' ? 'white' : 'black';
+        room.guestRole = room.hostRole === 'black' ? 'white' : 'black';
+
+        room.host.sendJson({
+          type: 'RESTART_START',
+          role: room.hostRole,
+          message: `再戦開始！手番を交代し、あなたは ${room.hostRole === 'black' ? '黒 (先手)' : '白 (後手)'} です。`
+        });
         if (room.guest) {
-          room.guest.sendJson({ type: 'RESTART_START' });
+          room.guest.sendJson({
+            type: 'RESTART_START',
+            role: room.guestRole,
+            message: `再戦開始！手番を交代し、あなたは ${room.guestRole === 'black' ? '黒 (先手)' : '白 (後手)'} です。`
+          });
         }
         break;
       }

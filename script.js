@@ -78,6 +78,7 @@ class OthelloGame {
 
     // モーダル
     this.onlineModalEl = document.getElementById('online-modal');
+    this.hostColorChoiceEl = document.getElementById('host-color-choice');
     this.btnCreateRoomEl = document.getElementById('btn-create-room');
     this.btnJoinRoomEl = document.getElementById('btn-join-room');
     this.inputRoomIdEl = document.getElementById('input-room-id');
@@ -658,7 +659,8 @@ class OthelloGame {
 
     this.ws.onopen = () => {
       if (action === 'create') {
-        this.ws.send(JSON.stringify({ type: 'CREATE_ROOM' }));
+        const hostChoice = this.hostColorChoiceEl ? this.hostColorChoiceEl.value : 'black';
+        this.ws.send(JSON.stringify({ type: 'CREATE_ROOM', hostChoice }));
       } else {
         this.ws.send(JSON.stringify({ type: 'JOIN_ROOM', roomId }));
       }
@@ -694,12 +696,12 @@ class OthelloGame {
     switch (data.type) {
       case 'ROOM_CREATED': {
         this.onlineRoomId = data.roomId;
-        this.onlineRole = BLACK; // ホストは黒（先手）
         this.waitingRoomIdEl.textContent = data.roomId;
         this.displayRoomIdEl.textContent = data.roomId;
-        this.displayRoleInfoEl.textContent = 'あなたの色: 黒 (先手)';
-        this.nameBlackEl.textContent = '黒 (あなた)';
-        this.nameWhiteEl.textContent = '白 (対戦相手)';
+        let choiceText = '黒 (先手)';
+        if (data.hostChoice === 'white') choiceText = '白 (後手)';
+        if (data.hostChoice === 'random') choiceText = '🎲 ランダム (開始時に決定)';
+        this.displayRoleInfoEl.textContent = `あなたの希望: ${choiceText}`;
         this.setConnectionStatus('waiting', `部屋番号: ${data.roomId} (待機中)`);
         this.openModal(this.waitingModalEl);
         break;
@@ -753,7 +755,20 @@ class OthelloGame {
       }
 
       case 'RESTART_START': {
-        this.setMessage('再戦が開始されました！');
+        if (data.role) {
+          if (data.role === 'white') {
+            this.onlineRole = WHITE;
+            this.displayRoleInfoEl.textContent = 'あなたの色: 白 (後手)';
+            this.nameBlackEl.textContent = '黒 (対戦相手)';
+            this.nameWhiteEl.textContent = '白 (あなた)';
+          } else {
+            this.onlineRole = BLACK;
+            this.displayRoleInfoEl.textContent = 'あなたの色: 黒 (先手)';
+            this.nameBlackEl.textContent = '黒 (あなた)';
+            this.nameWhiteEl.textContent = '白 (対戦相手)';
+          }
+        }
+        this.setMessage(data.message || '再戦が開始されました！');
         this.startNewGame();
         break;
       }

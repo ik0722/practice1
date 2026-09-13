@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>オセロ (Reversi) - リアルタイム対戦</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -109,14 +109,23 @@
 
       <div class="online-modal-options">
         <div class="modal-box">
-          <h3>部屋を作る (先手: 黒)</h3>
+          <h3>部屋を作る</h3>
+          <div style="margin: 8px 0 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <label for="host-color-choice" style="font-size: 0.85rem; color: #ccc;">あなたの手番:</label>
+            <select id="host-color-choice" style="background: #1a252f; color: #fff; border: 1px solid #4b6584; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; outline: none; cursor: pointer;">
+              <option value="black">黒 (先手)</option>
+              <option value="white">白 (後手)</option>
+              <option value="random">🎲 ランダム (おまかせ)</option>
+            </select>
+          </div>
           <button class="btn btn-primary" id="btn-create-room">新しい部屋を作成</button>
         </div>
 
         <div class="modal-divider">または</div>
 
         <div class="modal-box">
-          <h3>部屋に入る (後手: 白)</h3>
+          <h3>部屋に入る</h3>
+          <p style="font-size: 0.78rem; color: #aaa; margin-bottom: 8px;">※ 手番はホストの設定に応じて決まります</p>
           <div class="input-group">
             <input type="text" id="input-room-id" placeholder="部屋番号 (4桁)" maxlength="10">
             <button class="btn" id="btn-join-room">参加</button>
@@ -174,6 +183,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=4"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>
