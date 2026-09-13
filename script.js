@@ -109,13 +109,6 @@ class OthelloGame {
         cell.dataset.row = r;
         cell.dataset.col = c;
 
-        // 星（星印ドット：(2,2), (2,6), (6,2), (6,6) の角）
-        if ((r === 2 || r === 6) && (c === 2 || c === 6)) {
-          const dot = document.createElement('div');
-          dot.classList.add('star-dot');
-          cell.appendChild(dot);
-        }
-
         cell.addEventListener('click', () => this.handleCellClick(r, c));
         this.boardEl.appendChild(cell);
         this.cellElements[r][c] = cell;

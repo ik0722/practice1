@@ -229,17 +229,6 @@ h1 {
   cursor: pointer;
 }
 
-/* 星印 (天元・星) */
-.star-dot {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background-color: var(--line-color);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 1;
-}
-
 /* ガイド（合法手マーク） */
 .cell.valid-move::after {
   content: "";
