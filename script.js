@@ -169,6 +169,14 @@ class OthelloGame {
       this.initiateOnline('join', roomId);
     });
 
+    // 部屋番号入力欄でEnterキーを押した時に「参加」ボタンを実行
+    this.inputRoomIdEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.btnJoinRoomEl.click();
+      }
+    });
+
     this.btnCancelOnlineEl.addEventListener('click', () => {
       this.closeModal(this.onlineModalEl);
       this.mode = 'cpu-easy';
