@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>オセロ (Reversi) - リアルタイム対戦</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -164,13 +164,13 @@
     </div>
   </div>
 
-  <!-- 相手退出通知モーダル -->
+  <!-- 接続切断・退出通知モーダル（両者に表示） -->
   <div class="modal-overlay" id="opponent-left-modal">
     <div class="modal-content">
-      <h2 class="modal-title" style="color: #e74c3c;">⚠️ 対戦相手が退出しました</h2>
-      <p class="modal-desc" style="margin-bottom: 20px;">
-        相手との接続が切断されました。<br>
-        自動的に<strong>CPU対戦モード</strong>に切り替えます。
+      <h2 class="modal-title" id="disconnect-modal-title" style="color: #e74c3c;">⚠️ 通信が途切れました</h2>
+      <p class="modal-desc" id="disconnect-modal-desc" style="margin-bottom: 20px;">
+        接続が切断されました。<br>
+        CPU対戦に切り替えるか、再接続してください。
       </p>
       <div class="modal-btns" style="flex-direction: column; gap: 10px;">
         <button class="btn btn-primary" id="btn-resume-cpu" style="width: 100%;">
@@ -179,10 +179,13 @@
         <button class="btn" id="btn-new-cpu" style="width: 100%;">
           🔄 新しくCPU対戦を始める
         </button>
+        <button class="btn" id="btn-reload-game" style="width: 100%; background: #2980b9;">
+          🌐 再接続する（画面を再読み込み）
+        </button>
       </div>
     </div>
   </div>
 
-  <script src="script.js?v=5"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>

@@ -94,10 +94,13 @@ class OthelloGame {
     this.modalBtnRestartEl = document.getElementById('modal-btn-restart');
     this.modalBtnCloseEl = document.getElementById('modal-btn-close');
 
-    // 相手退出モーダル
+    // 相手退出・接続切断モーダル
     this.opponentLeftModalEl = document.getElementById('opponent-left-modal');
+    this.disconnectModalTitleEl = document.getElementById('disconnect-modal-title');
+    this.disconnectModalDescEl = document.getElementById('disconnect-modal-desc');
     this.btnResumeCpuEl = document.getElementById('btn-resume-cpu');
     this.btnNewCpuEl = document.getElementById('btn-new-cpu');
+    this.btnReloadGameEl = document.getElementById('btn-reload-game');
 
     // 盤面グリッド生成 (8x8)
     this.boardEl.innerHTML = '';
@@ -187,9 +190,12 @@ class OthelloGame {
       this.startNewGame();
     });
 
-    // 相手退出モーダルのボタンイベント
+    // 相手退出・接続切断モーダルのボタンイベント
     this.btnResumeCpuEl.addEventListener('click', () => this.resumeWithCpu());
     this.btnNewCpuEl.addEventListener('click', () => this.switchToCpu(true));
+    if (this.btnReloadGameEl) {
+      this.btnReloadGameEl.addEventListener('click', () => window.location.reload());
+    }
 
     this.btnCopyRoomEl.addEventListener('click', () => {
       if (this.onlineRoomId) {
@@ -676,20 +682,40 @@ class OthelloGame {
     };
 
     this.ws.onerror = () => {
-      alert('サーバーとの通信エラーが発生しました。\nターミナルで `node server.js` を実行してサーバーを起動してください。');
+      if (this.mode === 'online') {
+        this.setConnectionStatus('offline', '通信エラー');
+        this.showDisconnectModal(
+          '⚠️ 通信エラーが発生しました',
+          'サーバーとの接続に問題が発生しました。<br>インターネット接続をご確認ください。'
+        );
+      }
       this.disconnectOnline();
     };
 
     this.ws.onclose = () => {
       if (this.mode === 'online') {
         this.setConnectionStatus('offline', '切断されました');
-        if (this.isOnlineReady && !this.isGameOver) {
-          this.isOnlineReady = false;
-          this.openModal(this.opponentLeftModalEl);
-        }
+        this.showDisconnectModal(
+          '⚠️ サーバーとの接続が途切れました',
+          '通信接続が切断されました。<br>CPU対戦に切り替えるか、再接続をお試しください。'
+        );
         this.isOnlineReady = false;
       }
     };
+  }
+
+  showDisconnectModal(title, message) {
+    if (this.disconnectModalTitleEl) this.disconnectModalTitleEl.textContent = title;
+    if (this.disconnectModalDescEl) this.disconnectModalDescEl.innerHTML = message;
+
+    // 対局中だった場合は「CPUと対戦を続ける」を表示、待機中なら非表示
+    if (this.btnResumeCpuEl) {
+      this.btnResumeCpuEl.style.display = (this.isOnlineReady && !this.isGameOver) ? 'block' : 'none';
+    }
+
+    this.closeModal(this.waitingModalEl);
+    this.closeModal(this.onlineModalEl);
+    this.openModal(this.opponentLeftModalEl);
   }
 
   handleServerMessage(data) {
@@ -782,8 +808,10 @@ class OthelloGame {
         this.isOnlineReady = false;
         this.setConnectionStatus('offline', '相手が退出しました');
         this.setMessage('対戦相手が退出しました。');
-        // alertの代わりに専用モーダルを表示
-        this.openModal(this.opponentLeftModalEl);
+        this.showDisconnectModal(
+          '⚠️ 対戦相手の接続が途切れました',
+          '相手プレイヤーとの通信が切断されました。<br>このままCPUと対戦を続けるか、新しく開始してください。'
+        );
         break;
       }
 
